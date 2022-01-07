@@ -3,7 +3,8 @@ library(tidyverse)
 library(leafletwrappers)
 library(sf)
 library(tpfuncts)
-
+library(htmltools)
+library(RColorBrewer)
 
 
 land_recode <- openxlsx::read.xlsx("./data/county_code_expl.xlsx", sheet = "Code Explanations") %>%
@@ -57,7 +58,7 @@ quantile(st_drop_geometry(tp_prop_shp)[["pct_chng_val"]], probs = seq(0, 1, .05)
 
 # tp_prop_bins <- c(100, 175000, 310000, 475000, 525000, 575000, 625000, 700000, 800000, 1000000, 51000000)
 
-tp_prop_bins <- c(100, 175000, 350000, 500000, 60000, 700000, 800000, 1000000, 51000000)
+tp_prop_bins <- c(100, 175000, 350000, 500000, 600000, 700000, 800000, 1000000, 51000000)
 
 
 tp_chng_bins <- c(-30, -5, 0, 5, 10, 20, 25, 30, 40, 50, 100, 750)
@@ -90,6 +91,44 @@ labs_poly <- leafletwrappers::label_standardize(st_drop_geometry(tp_prop_shp),
                                            Land use category: {land.use.desc}<p></p>
                                            Owner occupanyc: {owner.occ.desc}")
 
+
+# set popup options
+# browsable(
+#   tagList(list(
+#     tags$head(
+#       tags$style(
+#         ".leaflet-popup-content-wrapper {
+#     padding: 2px;
+#     border-radius: 0px;
+#     line-height: 0.8
+# 
+#     }
+#         "
+#       )
+#     ),
+#     map2
+#   ))
+# )
+
+tag.map.title <- tags$style(HTML("
+  .leaflet-control.map-title { 
+    transform: translate(-50%,20%);
+    position: fixed !important;
+    left: 50%;
+    text-align: center;
+    padding-left: 12px; 
+    padding-right: 12px; 
+    background: rgba(255,255,255,0.75);
+    font-weight: bold;
+    font-size: 14px;
+  }
+"))
+
+title <- tags$div(
+  tag.map.title, HTML("Takoma Park Property Assessments 2022")
+)  
+
+
 add_prop_vals <- function(basemap,
                           var,
                           pal_funct,
@@ -105,29 +144,39 @@ add_prop_vals <- function(basemap,
       fillOpacity = 0.7, 
       fillColor = ~ pal_funct(as.data.frame(df)[[var]]), 
       group = grp,
+      popupOptions = leaflet::popupOptions(
+        maxHeight = 200,
+        maxWidth = 200
+        ),
+      label = ~ address_full,
+      labelOptions = labelOptions(
+        style = list(`font-weight` = "normal",
+                     padding = "0.2px 0.2px",
+                     `line-height` = 0.8),
+        textsize = "10px",
+        direction = "auto",
+        opacity = 0.8
+      ),
       highlight = leaflet::highlightOptions(
         stroke = TRUE,
-        weight = 3.5, 
+        weight = 3.5,
         fillOpacity = 0.6, 
         color = "#555EE7",
         opacity = 1, 
         bringToFront = TRUE), 
-      label = purrr::map(labs, htmltools::HTML), 
-      labelOptions = leaflet::labelOptions(
-        style = list(`font-weight` = "normal", 
-                     padding = "0.2px 0.2px", 
-                     `line-height` = 0.8), 
-        textsize = "10px", direction = "auto", 
-        opacity = 0.8), 
+      popup = purrr::map(labs, htmltools::HTML), 
+
       data = df) %>%
     addLegend(position = "topright", 
               pal = pal_funct, 
               values = ~ as.data.frame(df)[[var]], 
               group = grp, 
               opacity = 0.7, 
-              title= grp)
+              title= paste0("Takoma Park Property Assessments, 2022<br>
+                            ", grp))
 }
 
+test_control <- tags$div(HTML("Click on a highlighted property to find out more information"))
 
 # addlegend_standard()
 carto_map <- leaflet(tp_prop_shp) %>%
@@ -139,7 +188,11 @@ carto_map <- leaflet(tp_prop_shp) %>%
                                               "Percent change in property values"), 
                             position = "topleft", 
                             options = layersControlOptions(collapsed = F)) %>%
-  hideGroup("Percent change in property values")
+  hideGroup("Percent change in property values") %>%
+  addControl(html = test_control, position = "bottomleft")
+  # addControl(title, position = "topleft", className="map-title")
+
+carto_map
 
 reg_map <- leaflet(tp_prop_shp) %>%
   # addProviderTiles(providers$CartoDB) %>%
@@ -150,7 +203,9 @@ reg_map <- leaflet(tp_prop_shp) %>%
                                               "Percent change in property values"), 
                             position = "topleft", 
                             options = layersControlOptions(collapsed = F)) %>%
-  hideGroup("Percent change in property values")
+  hideGroup("Percent change in property values") %>%
+  addControl(html = test_control, position = "bottomleft")
+
 
 htmlwidgets::saveWidget(reg_map, "./data/reg_map.html", selfcontained = T)
 htmlwidgets::saveWidget(carto_map, "./data/carto_map.html", selfcontained = T)
@@ -248,7 +303,9 @@ carto_map_16 <- leaflet(tp_prop_shp_16merge) %>%
                                               "Percent change in property values since 2019", "Percent change in property values since 2016"), 
                             position = "topleft", 
                             options = layersControlOptions(collapsed = F)) %>%
-  hideGroup(c("Percent change in property values since 2019", "Percent change in property values since 2016"))
+  hideGroup(c("Percent change in property values since 2019", "Percent change in property values since 2016")) %>%
+  addControl(html = test_control, position = "bottomleft")
+
 
 reg_map_16 <- leaflet(tp_prop_shp) %>%
   # addProviderTiles(providers$CartoDB) %>%
@@ -260,7 +317,9 @@ reg_map_16 <- leaflet(tp_prop_shp) %>%
                                               "Percent change in property values since 2019", "Percent change in property values since 2016"), 
                             position = "topleft", 
                             options = layersControlOptions(collapsed = F)) %>%
-  hideGroup(c("Percent change in property values since 2019", "Percent change in property values since 2016"))
+  hideGroup(c("Percent change in property values since 2019", "Percent change in property values since 2016")) %>%
+  addControl(html = test_control, position = "bottomleft")
+
 
 htmlwidgets::saveWidget(reg_map_16, "./data/reg_map_16.html", selfcontained = T)
 htmlwidgets::saveWidget(carto_map_16, "./data/carto_map_16.html", selfcontained = T)
@@ -272,6 +331,145 @@ tp_prop_shp_checkvals <- tp_prop_shp %>%
          check_land = current.land.value == land_assmt)
 
 write.csv(tp_prop_shp_checkvals, "./data/tp_prop_shp_checkvals.csv")
+
+leafletwrappers::
+
+#### load in points shapefile
+points_file <- st_read("./data/Property_Points.gdb") %>%
+  st_transform(4326) %>%
+  rename_all(tolower)
+
+tp_points_read <- points_file %>%
+  right_join(tp_prop_missing, by = c("tax_no" = "acct" ))
+
+
+sf::sf_use_s2(FALSE)
+intersect_city <- tp_points_read %>%
+  st_intersection(wards %>%
+                  st_transform(4326))
+
+tp_points <- intersect_city
+
+missing_points <-tp_points_read %>%
+  anti_join( points_file, by = c("acct" = "tax_no"))
+
+quantile(st_drop_geometry(tp_points)[["current.value"]], probs = seq(0, 1, .05))
+
+tp_prop_bins_condos <- c(100, 50000, 100000, 150000, 200000, 250000, 300000, 1000000)
+
+pal_condos <- c("#808080", "#BEC5C6", brewer.pal(length(tp_prop_bins_condos) - 2, "Blues"))
+
+pal_tp_propvals_condos <- leaflet::colorBin(pal_condos, domain = c(100, 1000000),
+                                     bins = tp_prop_bins_condos)
+# 
+# colors <- RColorBrewer::brewer.pal(11, "PiYG")
+# colors <- RColorBrewer::brewer.pal(11, "Greens")[-1]
+# 
+# 
+# chng_colors <- c("#8E0152", "#F1B6DA", "#F7F7F7", colors)
+# 
+# pal_tp_chngval <- leaflet::colorBin(palette = chng_colors, domain = c(-30, 750),
+#                                     bins = tp_chng_bins)
+
+# quantile(st_drop_geometry(tp_points)[["pct_chng_val"]], probs = seq(0, 1, .05))
+
+
+labs_points <- leafletwrappers::label_standardize(st_drop_geometry(tp_points), 
+                                                label_text = 
+                                                  "Address: {address_full}<p></p>
+                                           Date of construction: {year_built}<p></p>
+                                           Current value (2022): ${current.value %>% commafy}<p></p>
+                                           Last assessment value (2019): ${base.value %>% commafy}<p></p>
+                                           Change in value: ${chng_value %>% commafy}<p></p>
+                                           Percent change in value: {pct_chng_val}%<p></p>
+                                           Current value of land: ${current.land.value %>% commafy}<p></p>
+                                           Current value of improvements: ${current.imp.value %>% commafy}<p></p>
+                                           Taxable value: ${taxable.value %>% commafy}<p></p>
+                                           Land use category: {land.use.desc}<p></p>
+                                           Owner occupanyc: {owner.occ.desc}")
+
+
+add_point_vals <- function(basemap,
+                          var,
+                          pal_funct,
+                          grp = "Current property values (condos and other point-properties)",
+                          labs = labs_poly,
+                          df = tp_prop_shp) {
+  basemap %>%
+    leaflet::addCircleMarkers(
+      radius = 0.1,
+      color = ~ pal_funct(st_drop_geometry(df)[[var]]), 
+      group = grp,
+      stroke = T,
+      weight = 15, 
+      data = df,
+      clusterOptions = markerClusterOptions(),
+      popupOptions = leaflet::popupOptions(
+        maxHeight = 200,
+        maxWidth = 200
+      ),
+      label = ~ address_full,
+      labelOptions = labelOptions(
+        style = list(`font-weight` = "normal",
+                     padding = "0.2px 0.2px",
+                     `line-height` = 0.8),
+        textsize = "10px",
+        direction = "auto",
+        opacity = 0.8
+      ),
+      # highlight = leaflet::highlightOptions(
+      #   stroke = TRUE,
+      #   weight = 3.5,
+      #   fillOpacity = 0.6, 
+      #   color = "#555EE7",
+      #   opacity = 1, 
+      #   bringToFront = TRUE), 
+      popup = purrr::map(labs, htmltools::HTML)
+      ) %>%
+    addLegend(position = "topright", 
+              pal = pal_funct, 
+              values = ~ as.data.frame(df)[[var]], 
+              group = grp, 
+              opacity = 0.7,
+              title= grp)
+}
+
+condo_control <- tags$div(HTML("Click on a highlighted property to find out more information. Click on point-clusters to break them into smaller clusters and points; click on the point to find out more information"))
+
+carto_map_points <- leaflet(tp_prop_shp) %>%
+  addProviderTiles(providers$CartoDB) %>%
+  # addTiles(options = tileOptions(opacity = 0.5)) %>%
+  add_prop_vals(pal_funct = pal_tp_propvals, var = "current.value") %>%
+  add_prop_vals(pal_funct = pal_tp_chngval, var = "pct_chng_val", grp = "Percent change in property values") %>%
+  leaflet::addLayersControl(overlayGroups = c(
+    "Current property values", 
+    "Current property values (condos and other point-properties)", 
+    "Percent change in property values", 
+    "Percent change in property values (condos and other point-properties)"
+  ), 
+  position = "topleft", 
+  options = layersControlOptions(collapsed = F)) %>%
+  add_point_vals(var = "current.value", pal_funct = pal_tp_propvals_condos, labs = labs_points, df = tp_points) %>%
+  add_point_vals(var = "pct_chng_val", pal_funct = pal_tp_chngval, grp = "Percent change in property values (condos and other point-properties)", labs = labs_points, df = tp_points) %>%
+  hideGroup(c("Current property values (condos and other point-properties)", "Percent change in property values", "Percent change in property values (condos and other point-properties)")) %>%
+  addControl(html = condo_control, position = "bottomleft")
+
+carto_map_points
+
+htmlwidgets::saveWidget(carto_map_points, "./data/carto_map_points.html", selfcontained = T)
+
+
+
+tp_prop_shp <- mc_prop_shp %>%
+  rename_all(tolower) %>%
+  right_join(tp_props, 
+             by = "acct")
+
+tp_prop_missing <- tp_props %>%
+  anti_join((mc_prop_shp %>%
+               rename_all(tolower)), 
+            by = "acct")
+
 
 
 ### work with condos
