@@ -404,10 +404,10 @@ add_point_vals <- function(basemap,
   basemap %>%
     leaflet::addCircleMarkers(
       radius = 0.1,
-      color = ~ pal_funct(st_drop_geometry(df)[[var]]), 
+      color = ~ pal_funct(st_drop_geometry(df)[[var]]),
       group = grp,
       stroke = T,
-      weight = 15, 
+      weight = 20, 
       data = df,
       clusterOptions = markerClusterOptions(),
       popupOptions = leaflet::popupOptions(
@@ -450,8 +450,8 @@ carto_map_points <- leaflet(tp_prop_shp) %>%
   add_prop_vals(pal_funct = pal_tp_chngval, var = "pct_chng_val", grp = "Percent change in property values") %>%
   leaflet::addLayersControl(overlayGroups = c(
     "Current property values", 
-    "Current property values (condos and other point-properties)", 
     "Percent change in property values", 
+    "Current property values (condos and other point-properties)",
     "Percent change in property values (condos and other point-properties)"
   ), 
   position = "topleft", 
@@ -467,7 +467,6 @@ htmlwidgets::saveWidget(carto_map_points, "./data/carto_map_points.html", selfco
 htmlwidgets::saveWidget(carto_map_points, "./data/property-tax-map-points.html", selfcontained = T)
 
 
-
 tp_prop_shp <- mc_prop_shp %>%
   rename_all(tolower) %>%
   right_join(tp_props, 
@@ -477,12 +476,6 @@ tp_prop_missing <- tp_props %>%
   anti_join((mc_prop_shp %>%
                rename_all(tolower)), 
             by = "acct")
-
-
-
-### work with condos
-# look at condo layer
-condo_poly
 
 
 
