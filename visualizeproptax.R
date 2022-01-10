@@ -61,7 +61,9 @@ quantile(st_drop_geometry(tp_prop_shp)[["pct_chng_val"]], probs = seq(0, 1, .05)
 tp_prop_bins <- c(100, 175000, 350000, 500000, 600000, 700000, 800000, 1000000, 51000000)
 
 
-tp_chng_bins <- c(-30, -5, 0, 5, 10, 20, 25, 30, 40, 50, 100, 750)
+# tp_chng_bins <- c(-30, -5, 0, 5, 10, 20, 25, 30, 40, 50, 100, 750)
+tp_chng_bins <- c(-30, -5, 0, 10, 20, 30, 40, 50, 100, 750)
+
 
 pal_tp_propvals <- leaflet::colorBin("Blues", domain = c(100, 51000000),
                                     bins = tp_prop_bins)
@@ -209,6 +211,7 @@ reg_map <- leaflet(tp_prop_shp) %>%
 
 htmlwidgets::saveWidget(reg_map, "./data/reg_map.html", selfcontained = T)
 htmlwidgets::saveWidget(carto_map, "./data/carto_map.html", selfcontained = T)
+htmlwidgets::saveWidget(carto_map, "./data/property-tax-map.html", selfcontained = T)
 
 
 # 
@@ -287,7 +290,9 @@ labs_poly_16 <- leafletwrappers::label_standardize(st_drop_geometry(tp_prop_shp_
 quantile(st_drop_geometry(tp_prop_shp_16merge)[["pct_chng_val_1622"]], probs = seq(0, 1, .05), na.rm = T)
 
 
-tp_chng_bins <- c(-100, -30, -5, 0, 5, 10, 20, 25, 30, 40, 50, 100, 750)
+# tp_chng_bins <- c(-100, -30, -5, 0, 5, 10, 20, 25, 30, 40, 50, 100, 750)
+tp_chng_bins <- c(-100, -30, -5, 0, 10, 20, 30, 40, 50, 100, 750)
+
 chng_colors <- c("#8E0152", "#C51B7D", "#F1B6DA", "#F7F7F7", colors)
 
 pal_tp_chngval <- leaflet::colorBin(palette = chng_colors, domain = c(-100, 750),
@@ -332,7 +337,7 @@ tp_prop_shp_checkvals <- tp_prop_shp %>%
 
 write.csv(tp_prop_shp_checkvals, "./data/tp_prop_shp_checkvals.csv")
 
-leafletwrappers::
+# leafletwrappers::
 
 #### load in points shapefile
 points_file <- st_read("./data/Property_Points.gdb") %>%
@@ -349,6 +354,7 @@ intersect_city <- tp_points_read %>%
                   st_transform(4326))
 
 tp_points <- intersect_city
+
 
 missing_points <-tp_points_read %>%
   anti_join( points_file, by = c("acct" = "tax_no"))
@@ -431,7 +437,8 @@ add_point_vals <- function(basemap,
               values = ~ as.data.frame(df)[[var]], 
               group = grp, 
               opacity = 0.7,
-              title= grp)
+              title= paste0("Takoma Park Property Assessments, 2022<br>
+                            ", grp))
 }
 
 condo_control <- tags$div(HTML("Click on a highlighted property to find out more information. Click on point-clusters to break them into smaller clusters and points; click on the point to find out more information"))
@@ -457,6 +464,7 @@ carto_map_points <- leaflet(tp_prop_shp) %>%
 carto_map_points
 
 htmlwidgets::saveWidget(carto_map_points, "./data/carto_map_points.html", selfcontained = T)
+htmlwidgets::saveWidget(carto_map_points, "./data/property-tax-map-points.html", selfcontained = T)
 
 
 
