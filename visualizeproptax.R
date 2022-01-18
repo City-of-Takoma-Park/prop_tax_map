@@ -6,6 +6,8 @@ library(tpfuncts)
 library(htmltools)
 library(RColorBrewer)
 
+# renv::init()
+
 # read in land-code values and owner code values from county assessor
 land_recode <- openxlsx::read.xlsx("./data/county_code_expl.xlsx", sheet = "Code Explanations") %>%
   rename_all(tolower)
@@ -92,7 +94,7 @@ labs_poly <- leafletwrappers::label_standardize(st_drop_geometry(tp_prop_shp),
                                            Current value of improvements: ${current.imp.value %>% commafy}<p></p>
                                            Taxable value: ${taxable.value %>% commafy}<p></p>
                                            Land use category: {land.use.desc}<p></p>
-                                           Owner occupanyc: {owner.occ.desc}")
+                                           Owner occupancy: {owner.occ.desc}")
 
 # define function for adding property tax polygon layers
 add_prop_vals <- function(basemap,
@@ -223,7 +225,7 @@ labs_poly_16 <- leafletwrappers::label_standardize(st_drop_geometry(tp_prop_shp_
                                            Current value of improvements: ${current.imp.value %>% commafy}<p></p>
                                            Taxable value: ${taxable.value %>% commafy}<p></p>
                                            Land use category: {land.use.desc}<p></p>
-                                           Owner occupanyc: {owner.occ.desc}")
+                                           Owner occupancy: {owner.occ.desc}")
 
 # view value distribution
 quantile(st_drop_geometry(tp_prop_shp_16merge)[["pct_chng_val_1622"]], probs = seq(0, 1, .05), na.rm = T)
@@ -338,7 +340,7 @@ labs_points <- leafletwrappers::label_standardize(st_drop_geometry(tp_points),
                                            Current value of improvements: ${current.imp.value %>% commafy}<p></p>
                                            Taxable value: ${taxable.value %>% commafy}<p></p>
                                            Land use category: {land.use.desc}<p></p>
-                                           Owner occupanyc: {owner.occ.desc}")
+                                           Owner occupancy: {owner.occ.desc}")
 
 # create function to add points layer
 add_point_vals <- function(basemap,
