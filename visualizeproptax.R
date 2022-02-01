@@ -179,7 +179,10 @@ htmlwidgets::saveWidget(reg_map, "./data/reg_map.html", selfcontained = T)
 htmlwidgets::saveWidget(carto_map, "./data/carto_map.html", selfcontained = T)
 htmlwidgets::saveWidget(carto_map, "./data/property-tax-map.html", selfcontained = T)
 
-#### work with county planning property data - sent by county planning
+
+############################################################################
+#### work with county planning property data - sent by county planning #####
+############################################################################
 county_data <- st_layers("./data/county_tax_data/TakomaPark/db.gdb")
 
 # readin 2016 assessment data
@@ -281,8 +284,10 @@ tp_prop_shp_checkvals <- tp_prop_shp %>%
 
 write.csv(tp_prop_shp_checkvals, "./data/tp_prop_shp_checkvals.csv")
 
-
+############################################################################
 #### load in points shapefile from county planning - https://montgomeryplanning.org/tools/gis-and-mapping/data-downloads/
+############################################################################
+
 points_file <- st_read("./data/Property_Points.gdb") %>%
   st_transform(4326) %>%
   rename_all(tolower)
@@ -415,3 +420,74 @@ carto_map_points
 
 htmlwidgets::saveWidget(carto_map_points, "./data/carto_map_points.html", selfcontained = T)
 htmlwidgets::saveWidget(carto_map_points, "./data/property-tax-map-points.html", selfcontained = T)
+
+
+############################################################################
+######################### calculate change in property values for city #####
+############################################################################
+
+summarize_tp_props <- tp_props %>%
+  group_by() %>%
+  summarize(
+    city_current_value = sum(current.value, na.rm = T),
+    city_base_value = sum(base.value, na.rm = T),
+    city_chng_value = city_current_value - city_base_value,
+    city_pct_chng_value = pct_round(city_chng_value, city_base_value),
+    city_current_tax_value = sum(taxable.value, na.rm = T),
+    city_phase_in_value = sum(phase.in.value, na.rm = T),
+    city_current_land_value = sum(current.land.value, na.rm = T),
+    city_current_imp_value = sum(current.imp.value, na.rm = T),
+    city_base_land_value = sum(base.land.value, na.rm = T),
+    city_base_imp_value = sum(base.imp.value, na.rm = T),
+    city_chnge_land_value = city_current_land_value - city_base_land_value,
+    city_pct_chng_land_value = pct_round(city_chnge_land_value, city_base_land_value),
+    city_chnge_imp_value = city_current_imp_value - city_base_imp_value,
+    city_pct_chng_imp_value = pct_round(city_chnge_imp_value, city_base_imp_value)
+    )
+
+lu_tp_props <- tp_props %>%
+  group_by(land.use.desc) %>%
+  summarize(
+    lu_current_value = sum(current.value, na.rm = T),
+    lu_base_value = sum(base.value, na.rm = T),
+    lu_chng_value = lu_current_value - lu_base_value,
+    lu_pct_chng_value = pct_round(lu_chng_value, lu_base_value),
+    lu_current_tax_value = sum(taxable.value, na.rm = T),
+    lu_current_land_value = sum(current.land.value, na.rm = T),
+    lu_current_imp_value = sum(current.imp.value, na.rm = T),
+    lu_base_land_value = sum(base.land.value, na.rm = T),
+    lu_base_imp_value = sum(base.imp.value, na.rm = T),
+    lu_chnge_land_value = lu_current_land_value - lu_base_land_value,
+    lu_pct_chng_land_value = pct_round(lu_chnge_land_value, lu_base_land_value),
+    lu_chnge_imp_value = lu_current_imp_value - lu_base_imp_value,
+    lu_pct_chng_imp_value = pct_round(lu_chnge_imp_value, lu_base_imp_value)
+  )
+
+ownerocc_tp_props <- tp_props %>%
+  group_by(owner.occ.desc) %>%
+  summarize(
+    oo_current_value = sum(current.value, na.rm = T),
+    oo_base_value = sum(base.value, na.rm = T),
+    oo_chng_value = oo_current_value - oo_base_value,
+    oo_pct_chng_value = pct_round(oo_chng_value, oo_base_value),
+    oo_current_tax_value = sum(taxable.value, na.rm = T),
+    oo_current_land_value = sum(current.land.value, na.rm = T),
+    oo_current_imp_value = sum(current.imp.value, na.rm = T),
+    oo_base_land_value = sum(base.land.value, na.rm = T),
+    oo_base_imp_value = sum(base.imp.value, na.rm = T),
+    oo_chnge_land_value = oo_current_land_value - oo_base_land_value,
+    oo_pct_chng_land_value = pct_round(oo_chnge_land_value, oo_base_land_value),
+    oo_chnge_imp_value = oo_current_imp_value - oo_base_imp_value,
+    oo_pct_chng_imp_value = pct_round(oo_chnge_imp_value, oo_base_imp_value)
+  )
+wb_props <- openxlsx::createWorkbook()
+
+openxlsx::addWorksheet(wb_props, sheetName = "city_vals")
+openxlsx::addWorksheet(wb_props, sheetName = "landuses")
+openxlsx::addWorksheet(wb_props, sheetName = "owneroccupied")
+
+openxlsx::writeDataTable(wb = wb_props, sheet = "city_vals", x = summarize_tp_props)
+openxlsx::writeDataTable(wb = wb_props, sheet = "landuses", x = lu_tp_props)
+openxlsx::writeDataTable(wb = wb_props, sheet = "owneroccupied", x = ownerocc_tp_props)
+
+openxlsx::saveWorkbook(wb_props, file = "./data/summary_propvals.xlsx",overwrite = T)
