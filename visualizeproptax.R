@@ -1,3 +1,6 @@
+#### purpose - generate maps of property tax changes from 2019 to 2022 at parcel level
+# last full run: jan 2022
+
 library(leaflet)
 library(tidyverse)
 library(leafletwrappers)
@@ -5,6 +8,7 @@ library(sf)
 library(tpfuncts)
 library(htmltools)
 library(RColorBrewer)
+library(plotly)
 
 # renv::init()
 
@@ -28,27 +32,126 @@ tp_props <- openxlsx::read.xlsx("./data/Takoma Park Tax Roll 01-01-2022.xlsx") %
   left_join(land_recode) %>%
   rename(land.use.desc = description)
 
+tp_props$account %>% unique()
+
 tp_props$land.use %>% unique()
 
 tp_props$length %>%
   unique
 
+tp_props_taxes <- tp_props %>%
+  mutate(taxpaid = taxable.value / 100 * 0.5397,
+         taxpaidinc = taxable.value / 100 * 0.5697,
+         taxvalcheck = taxable.value != current.value)
+
+write_rds(tp_props_taxes, "./data/tp_props_taxes.rds")
+
 # read in county property shapefile from https://montgomeryplanning.org/tools/gis-and-mapping/data-downloads/
+
 mc_prop_shp <- st_read("./data/Property/property.gdb") %>%
   st_transform(4326) %>%
+  rename_all(tolower) %>%
   st_cast("MULTIPOLYGON")
 
 # merge property shapefile and tp properties
-tp_prop_shp <- mc_prop_shp %>%
-  rename_all(tolower) %>%
+tp_prop_shp <- mc_prop_shp 
   right_join(tp_props, 
             by = "acct")
 
+# write tp prop shape - just address
+tp_prop_shp_stripped <- tp_prop_shp %>%
+  select(address_full, town_code) 
+
+st_write(tp_prop_shp_stripped, "./tp_prop_shp_stripped.geojson", delete_dsn = T)
+
+
 # per explanation from county planning office, unmatched = condos or other points; confirmed in data 
 tp_prop_missing <- tp_props %>%
-  anti_join((mc_prop_shp %>%
+  dplyr::anti_join((mc_prop_shp %>%
                rename_all(tolower)), 
              by = "acct")
+
+# write land use/other info of relevance from county df
+tp_props_lu <- tp_prop_shp %>%
+  select(address_full, town_code, acct, current.land.value, current.imp.value, current.value, base.land.value, base.imp.value, base.value, status, subdivision, sdat_area, acre_or_sqft, liber, folio, lot.x, block.x, tax_class, exempt_code, grid.x, parcel_no, subparcel, property_code, landuse_code, lu_category, az_code, azcode_name, dwellingconstrcode_name, dwellstoryname, publicuse_type, legal_desc, condo_unit_no, gr_flr_area, no_stories, no_dwellings, dwelling_type, dwellingtype_name, year_built, dwelling_grade, dwelling_construct_code, dwelling_story_code, dwelling_condition, commer_indus, public_use_code, municip, res_dwellu, nonres_dwellu, parking_units, sqft_residential, sqft_office, sqft_retail, sqft_industrial, sqft_other, sqft_pkg, exempt_desc, new_landusecode, shape_length, shape_area, shape)
+
+st_write(tp_props_lu, "./data/tp_props_lu.geojson")
+write_rds(tp_props_lu, "./data/tp_props_lu.rds")
+
+
+#######
+######## mayeb some county props in tp not joining by account - try intersect county file with ward boundaries
+########
+
+sf::sf_use_s2(FALSE)
+
+# use june 2022 props
+mc_prop_shp_0622_polys <- st_read("./data/countyprops_062022/Property_Polygons/property_polygons.gdb")
+mc_prop_shp_0622_points <- st_read("./data/countyprops_062022/Property_Points/property_points.gdb")
+
+tp_props_intersect <- mc_prop_shp_0622_polys %>%
+  st_cast("MULTIPOLYGON") %>%
+  st_transform(4326) %>%
+  st_intersection(leafletwrappers::wards_new) %>%
+  st_transform(4326) %>%
+  rename_all(tolower) %>%
+  st_cast("MULTIPOLYGON")
+
+tp_props_intersect_points <- mc_prop_shp_0622_points %>%
+  st_transform(4326) %>%
+  st_intersection(leafletwrappers::wards_new) %>%
+  st_transform(4326) %>%
+  rename_all(tolower)
+
+# leaflet(tp_props_intersect_points) %>%
+#   addTiles() %>%
+#   addMarkers()
+
+# write file of properties intersected with tp boundaries
+write_rds(tp_props_intersect, "./data/output/tp_props_intersect.rds")
+
+tp_props_intersect <- readRDS("./data/output/tp_props_intersect.rds")
+
+openxlsx::write.xlsx(sf::st_drop_geometry(tp_props_intersect), "./data/output/tp_props_intersect.xlsx", asTable = T)
+
+st_write(tp_props_intersect, "./data/output/tp_props_intersect.geojson")
+
+write_rds(tp_props_intersect_points, "./data/output/tp_props_intersect_points.rds")
+
+tp_props_intersect_points <- readRDS("./data/output/tp_props_intersect_points.rds")
+
+openxlsx::write.xlsx(sf::st_drop_geometry(tp_props_intersect_points), "./data/output/tp_props_intersect_points.xlsx", asTable = T)
+
+
+st_write(tp_props_intersect_points, "./data/output/tp_props_intersect_points.geojson")
+
+
+# merge tp tax property data to properties inside TP bounds
+merge_intersect_props <- tp_props_intersect 
+  full_join(tp_props, 
+             by = "acct") 
+
+# identify properties in property tax info data file that are not represented in intersected poylgons with city boundaries
+missing_props_nonshp <- tp_props %>%
+  anti_join(tp_props_intersect, 
+            by = "acct") 
+
+# see if merging to mc props in general finds any more - only one
+props_outside_bounds <-mc_prop_shp %>%
+  rename_all(tolower) %>%
+  inner_join(missing_props_nonshp, by = "acct")
+
+# identify polygons in intersected polygon file that are not joined to property tax data file
+missing_props_shp <- tp_props_intersect %>%
+  anti_join(tp_props, 
+            by = "acct")
+
+# compare non-missing rows in inner-joined prop tax and shape to intersected props and wards - 4602 vs. 4235
+tp_prop_shp_inner <- mc_prop_shp %>%
+  rename_all(tolower) %>%
+  inner_join(tp_props, 
+             by = "acct")
+
 
 # generate palette for data
 pal_tp_propvals <- leafletwrappers::pal_numeric(colors = "Blues", var = "current.value", df = st_drop_geometry(tp_prop_shp), reverse = F)
@@ -152,10 +255,14 @@ carto_map <- leaflet(tp_prop_shp) %>%
   addProviderTiles(providers$CartoDB) %>%
   add_prop_vals(pal_funct = pal_tp_propvals, var = "current.value") %>%
   add_prop_vals(pal_funct = pal_tp_chngval, var = "pct_chng_val", grp = "Percent change in property values") %>%
-  leaflet::addLayersControl(overlayGroups = c("Current property values",
-                                              "Percent change in property values"), 
-                            position = "topleft", 
-                            options = layersControlOptions(collapsed = F)) %>%
+  leaflet::addLayersControl(
+    overlayGroups = c(
+      "Current property values",
+      "Percent change in property values"
+    ), 
+    position = "topleft", 
+    options = layersControlOptions(collapsed = F)
+  ) %>%
   hideGroup("Percent change in property values") %>%
   addControl(html = test_control, position = "bottomleft")
 
@@ -297,7 +404,6 @@ tp_points_read <- points_file %>%
   right_join(tp_prop_missing, by = c("tax_no" = "acct" ))
 
 
-sf::sf_use_s2(FALSE)
 
 # a few erroneous polygons well outside city - filter those out, will check with county
 intersect_city <- tp_points_read %>%
@@ -491,3 +597,5 @@ openxlsx::writeDataTable(wb = wb_props, sheet = "landuses", x = lu_tp_props)
 openxlsx::writeDataTable(wb = wb_props, sheet = "owneroccupied", x = ownerocc_tp_props)
 
 openxlsx::saveWorkbook(wb_props, file = "./data/summary_propvals.xlsx",overwrite = T)
+
+
